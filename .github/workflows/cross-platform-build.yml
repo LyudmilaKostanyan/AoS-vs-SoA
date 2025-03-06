@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-13] # Changed from macos-latest to macos-13
         build_type: [Release]
         c_compiler: [gcc, cl]
         include:
@@ -22,7 +22,7 @@ jobs:
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-          - os: macos-latest
+          - os: macos-13
             c_compiler: gcc
             cpp_compiler: g++
         exclude:
@@ -30,7 +30,7 @@ jobs:
             c_compiler: gcc
           - os: ubuntu-latest
             c_compiler: cl
-          - os: macos-latest
+          - os: macos-13
             c_compiler: cl
 
     steps:
@@ -108,7 +108,7 @@ jobs:
       continue-on-error: true
 
     - name: Debug with GDB (macOS)
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-13'
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       shell: bash
       run: |
