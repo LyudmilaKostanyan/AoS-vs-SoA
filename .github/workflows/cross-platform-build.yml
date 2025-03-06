@@ -79,14 +79,31 @@ jobs:
 
     - name: Run tests (Linux & macOS)
       if: runner.os != 'Windows'
+      shell: bash
       run: |
-        cd build
+        cd ${{ steps.strings.outputs.build-output-dir }}
+        if [ -f "./main" ]; then
+          echo "Running main:"
+          ./main
+        else
+          echo "Error: main not found in build directory"
+          ls -la
+          exit 1
+        fi
 
     - name: Run tests (Windows - MSVC)
       if: runner.os == 'Windows' && matrix.c_compiler == 'cl'
       shell: cmd
       run: |
-        cd build
+        cd ${{ steps.strings.outputs.build-output-dir }}
+        if exist Release\main.exe (
+          echo Running main.exe:
+          Release\main.exe
+        ) else (
+          echo Error: main.exe not found in Release directory
+          dir
+          exit /b 1
+        )
 
     - name: Debug with GDB (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -96,7 +113,7 @@ jobs:
         sudo apt-get update && sudo apt-get install -y gdb
         executable="./main"
         if [ -f "$executable" ]; then
-          echo "run" > gdb_commands.txt
+          echo "run --num_particles 500000" > gdb_commands.txt
           echo "quit" >> gdb_commands.txt
           echo "Running GDB:"
           gdb --batch --quiet -x gdb_commands.txt "$executable"
@@ -110,7 +127,7 @@ jobs:
       run: |
         executable="./main"
         if [ -f "$executable" ]; then
-          echo "run" > lldb_commands.txt
+          echo "run --num_particles 500000" > lldb_commands.txt
           echo "exit" >> lldb_commands.txt
           echo "Running LLDB:"
           lldb --batch -s lldb_commands.txt "$executable"
@@ -118,7 +135,7 @@ jobs:
       continue-on-error: true
 
     - name: Debug with CDB (Windows - MSVC)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
+      if: matrix.os == 'Windows' && matrix.c_compiler == 'cl'
       shell: cmd
       run: |
         cd ${{ steps.strings.outputs.build-output-dir }}
