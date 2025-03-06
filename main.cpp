@@ -1,8 +1,8 @@
 #include <iostream>
 #include <vector>
-#include <chrono>
 #include <random>
 #include <iomanip>
+#include <string>
 #include "kaizen.h"
 
 size_t num_particles = 1000000;
@@ -102,7 +102,7 @@ void updateSpinSoA(ParticleSoA& particles) {
 int main(int argc, char** argv) {
     zen::cmd_args args(argv, argc);
     auto particles_options = args.get_options("--num_particles");
-    if (!particles_options.size() || atoi(particles_options[0].c_str()) <= 0)
+    if (!particles_options.size() || std::stoi(particles_options[0]) <= 0)
         std::cerr << zen::color::red("num_particles has been set to the default value of 1000000.") << std::endl
                   << zen::color::red("To set your own value, pass it as an argument to your executable:") << std::endl
                   << "--num_particles *your_value*" << std::endl
