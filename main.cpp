@@ -2,20 +2,18 @@
 #include <vector>
 #include <chrono>
 #include <random>
-#include <iomanip> // For formatting the table
+#include <iomanip>
+#include "kaizen.h"
 
-// Constants
-const size_t NUM_PARTICLES = 1000000;
-const double HBAR = 1.0545718e-34; // Reduced Planck's constant
+size_t num_particles = 1000000;
+const double HBAR = 1.0545718e-34;
 
-// Array of Structs (AoS) implementation
 struct ParticleAoS {
-    double position[3];  // x, y, z
-    double momentum[3];  // px, py, pz
-    double spin[2];      // spin components (simplified)
+    double position[3];
+    double momentum[3];
+    double spin[2];
 };
 
-// Struct of Arrays (SoA) implementation
 struct ParticleSoA {
     std::vector<double> position_x;
     std::vector<double> position_y;
@@ -33,7 +31,6 @@ struct ParticleSoA {
     }
 };
 
-// Function to initialize particles with random values
 void initializeAoS(std::vector<ParticleAoS>& particles) {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -54,7 +51,7 @@ void initializeSoA(ParticleSoA& particles) {
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(-1.0, 1.0);
 
-    for (size_t i = 0; i < NUM_PARTICLES; i++) {
+    for (size_t i = 0; i < num_particles; i++) {
         particles.position_x[i] = dis(gen);
         particles.position_y[i] = dis(gen);
         particles.position_z[i] = dis(gen);
@@ -66,7 +63,6 @@ void initializeSoA(ParticleSoA& particles) {
     }
 }
 
-// Computation 1: Calculate total phase (position * momentum / hbar)
 double computePhaseAoS(const std::vector<ParticleAoS>& particles) {
     double total_phase = 0.0;
     for (const auto& p : particles) {
@@ -79,7 +75,7 @@ double computePhaseAoS(const std::vector<ParticleAoS>& particles) {
 
 double computePhaseSoA(const ParticleSoA& particles) {
     double total_phase = 0.0;
-    for (size_t i = 0; i < NUM_PARTICLES; i++) {
+    for (size_t i = 0; i < num_particles; i++) {
         total_phase += (particles.position_x[i] * particles.momentum_x[i] +
                        particles.position_y[i] * particles.momentum_y[i] +
                        particles.position_z[i] * particles.momentum_z[i]) / HBAR;
@@ -87,7 +83,6 @@ double computePhaseSoA(const ParticleSoA& particles) {
     return total_phase;
 }
 
-// Computation 2: Update spin states (simple rotation)
 void updateSpinAoS(std::vector<ParticleAoS>& particles) {
     for (auto& p : particles) {
         double temp = p.spin[0];
@@ -97,53 +92,60 @@ void updateSpinAoS(std::vector<ParticleAoS>& particles) {
 }
 
 void updateSpinSoA(ParticleSoA& particles) {
-    for (size_t i = 0; i < NUM_PARTICLES; i++) {
+    for (size_t i = 0; i < num_particles; i++) {
         double temp = particles.spin_x[i];
         particles.spin_x[i] = particles.spin_y[i];
         particles.spin_y[i] = -temp;
     }
 }
 
-int main() {
-    // Memory usage estimation
-    size_t aos_size = NUM_PARTICLES * sizeof(ParticleAoS);
-    size_t soa_size = NUM_PARTICLES * 8 * sizeof(double); // 8 arrays
+int main(int argc, char** argv) {
+    zen::cmd_args args(argv, argc);
+    auto particles_options = args.get_options("--num_particles");
+    if (!particles_options.size() || atoi(particles_options[0].c_str()) <= 0)
+        std::cerr << zen::color::red("num_particles has been set to the default value of 1000000.") << std::endl
+                  << zen::color::red("To set your own value, pass it as an argument to your executable:") << std::endl
+                  << "--num_particles *your_value*" << std::endl
+                  << zen::color::red("The value must be greater than 0.") << std::endl;
+    else
+        num_particles = atoi(particles_options[0].c_str());
+    
+    size_t aos_size = num_particles * sizeof(ParticleAoS);
+    size_t soa_size = num_particles * 8 * sizeof(double);
     double aos_mem_mb = aos_size / 1024.0 / 1024.0;
     double soa_mem_mb = soa_size / 1024.0 / 1024.0;
+    double mem_diff = aos_mem_mb - soa_mem_mb;
 
-    // Initialize AoS
-    std::vector<ParticleAoS> particles_aos(NUM_PARTICLES);
+    std::vector<ParticleAoS> particles_aos(num_particles);
     initializeAoS(particles_aos);
-
-    // Initialize SoA
-    ParticleSoA particles_soa(NUM_PARTICLES);
+    
+    ParticleSoA particles_soa(num_particles);
     initializeSoA(particles_soa);
 
-    // Benchmark AoS
-    auto start = std::chrono::high_resolution_clock::now();
+    zen::timer timer;
+    timer.start();
     double phase_aos = computePhaseAoS(particles_aos);
     updateSpinAoS(particles_aos);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto aos_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    timer.stop();
+    auto aos_time = timer.duration<zen::timer::msec>().count();
 
-    // Benchmark SoA
-    start = std::chrono::high_resolution_clock::now();
+    timer.start();
     double phase_soa = computePhaseSoA(particles_soa);
     updateSpinSoA(particles_soa);
-    end = std::chrono::high_resolution_clock::now();
-    auto soa_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    timer.stop();
+    auto soa_time = timer.duration<zen::timer::msec>().count();
+    auto time_diff = aos_time - soa_time;
 
-    // Output results in the requested table format
-    std::cout << "\nNums of particles = " << NUM_PARTICLES << "\n";
+    std::cout << "\nNums of particles = " << num_particles << "\n";
     std::cout << "-----------------------------------------------------------------\n";
-    std::cout << "                " << std::setw(15) << "AoS" << std::setw(15) << "SoA" << "\n";
+    std::cout << "                " << std::setw(15) << "AoS" << std::setw(15) << "SoA" << std::setw(15) << "Difference" << "\n";
     std::cout << "-----------------------------------------------------------------\n";
     std::cout << "Memory usage    " << std::fixed << std::setprecision(2) << std::setw(15) << aos_mem_mb 
-              << std::setw(15) << soa_mem_mb << "\n";
-    std::cout << "Time            " << std::setw(15) << aos_time 
-              << std::setw(15) << soa_time << "\n";
+              << std::setw(15) << soa_mem_mb << std::setw(15) << mem_diff << "\n";
+    std::cout << "Time (ms)       " << std::setw(15) << aos_time 
+              << std::setw(15) << soa_time << std::setw(15) << time_diff << "\n";
     std::cout << "Phase           " << std::scientific << std::setprecision(2) << std::setw(15) << phase_aos 
-              << std::setw(15) << phase_soa << "\n";
+              << std::setw(15) << phase_soa << std::setw(15) << "\n";
     std::cout << "-----------------------------------------------------------------\n";
 
     return 0;
