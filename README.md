@@ -70,7 +70,3 @@ Run the executable with the number of particles as a parameter:
 ```
 
 Replace `10000` with the desired number of particles.
-
----
-
-Let me know if you also want me to prepare this as a `README.md` file for you!
